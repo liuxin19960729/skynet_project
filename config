@@ -1,0 +1,20 @@
+root = "./skynet/"
+
+lua_path = root.."lualib/?.lua;"..root.."lualib/?/init.lua"
+
+luaservice = root.."service/?.lua;./app/?.lua"
+
+lualoader = root .. "lualib/loader.lua"
+
+lua_cpath = root .. "luaclib/?.so"
+
+cpath = root.."cservice/?.so"
+
+
+
+thread = 2
+logger = nil
+logpath = "."
+harbor = 0
+start = "main"	-- main script
+

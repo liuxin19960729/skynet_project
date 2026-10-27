@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Skynet",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/skynet/skynet",
+            "args": [ "${workspaceFolder}/config"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "make build",
+            "MIMode": "gdb",
+            "stopAtEntry": false,
+            "externalConsole": false
+        }
+    ]
+}

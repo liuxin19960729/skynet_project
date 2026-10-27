@@ -1,0 +1,21 @@
+
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "runtime.version": "Lua 5.5",
+    "runtime.path": [
+        "?.lua",
+        "?/init.lua",
+        "${workspaceFolder}/skynet/lualib/?.lua",
+        "${workspaceFolder}/skynet/lualib/?/init.lua",
+        "${workspaceFolder}/skynet/service/?.lua",
+        "${workspaceFolder}/skynet/examples/?.lua",
+        "${workspaceFolder}/app/?.lua"
+    ],
+    "workspace.library": [
+        "${workspaceFolder}/skynet/lualib",
+        "${workspaceFolder}/skynet/service",
+        "${workspaceFolder}/skynet/examples",
+        "${workspaceFolder}/app"
+    ],
+    "workspace.checkThirdParty": "Disable"
+}
