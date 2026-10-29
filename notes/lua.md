@@ -320,3 +320,20 @@ void luaL_checkversion (lua_State *L);
 检查调用它的内核是否是创建这个 Lua 状态机的内核。 以及调用它的代码是否使用了相同的 Lua 版本。 同时也检查调用它的内核与创建该 Lua 状态机的内核 是否使用了同一片地址空间。
 ```
 
+### 将参数推入栈
+```lua
+void lua_pushlightuserdata (lua_State *L, void *p);
+  将c指针作为light userdata 压入栈顶
+
+常见用途:
+    让lua持有C/C++对象地址
+
+
+例如
+   (void *)lua_touserdata(L,1)  // 获取lua 传给C/C++ 指针参数
+
+   
+
+
+
+```
