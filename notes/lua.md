@@ -51,232 +51,262 @@ void lua_close (lua_State *L);
 
 ```
 
-## 调用Lua方法
+## c调用lua方法
 ```c
 
 
+1.需要将执行的Lua 函数压入栈
+    
+    int lua_getglobal (lua_State *L, const char *name);
+    返回 全局变量 名为name的类型
+    键全局变量名为name的全局函数压入栈
 
-int lua_getglobal (lua_State *L, const char *name);
-把全局变量 name 里的值压栈，返回该值的类型。
+    [func]
 
 
+    note:如果要使用 lua_pcall 执行并且需要一个c函数捕获错误
+    例如
+        static int
+            traceback (lua_State *L) {
+                const char *msg = lua_tostring(L, 1);
+                if (msg)
+                    luaL_traceback(L, L, msg, 1);
+                else {
+                    lua_pushliteral(L, "(no error message)");
+                }
+                return 1;
+            }
+        
+        可以将 lua_pushcfunction(state,traceback) 推入到栈在执行将全局函数推入到栈  lua_getglobal(state,name)
 
-void lua_pushinteger (lua_State *L, lua_Integer n);
-把值为 n 的整数压栈。
 
+        [func,traceback]
+2.  
+  lua 函数需要几个参数将参数以此推入栈
+    [....arg2,arg1,func,traceback]
+    
+
+3.
 
 void lua_call (lua_State *L, int nargs, int nresults);
-遵循协议
-1.执行函数压入栈
-2.第一个参数压入栈
 
-nargs:压入栈的参数个数
-    
-note:函数调用完所有都出栈 这个时候返回值压入栈
+int lua_pcall (lua_State *L, int nargs, int nresults, int msgh);
 
-nresults:返回值个数，函数返回值将按正序压栈（第一个返回值首先压栈）， 因此在调用结束后，最后一个返回值将被放在栈顶。
+
+通过下面两个函数中的一个执行Lua函数
+
+
+nargs:压入参数个数
+nresults:返回值个数
+
+note:
+   1.lua_call or lua_pcall 执行完所有值都出栈,在压入返回值
+返回的值从栈底到栈顶依次 1,2,3...
+   2.lua_pcall 是保护模式执行
+   msgh 为 0 返回的错误信息回在所有值弹出栈的时候将信息压入栈
+    通过 lua_tostring 或 lua_tolstring 拿取信息
+   
+   msgh 可以设置栈上的处理函数的索引
+        [....arg2,arg1,func,traceback]
+
+        该处理的函数索引为 -1 或 1都可以
+
 
 
 int lua_pcall (lua_State *L, int nargs, int nresults, int msgh);
-以保护模式调用一个函数。
 
-如果有错误发生的话， lua_pcall 会捕获它， 然后把唯一的值（错误消息）压栈，然后返回错误码。
+返回时
 
-msgh:
-   如果 msgh 是 0 ， 返回在栈顶的错误消息就和原始错误消息完全一致。 否则， msgh 就被当成是 错误处理函数 在栈上的索引位置。 （在当前的实现里，这个索引不能是伪索引。） 在发生运行时错误时， 这个函数会被调用而参数就是错误消息。 错误处理函数的返回值将被 lua_pcall 作为错误消息返回在堆栈上。
-
-
-
-const char *lua_tostring (lua_State *L, int index);
-等价于调用 lua_tolstring ， 其参数 len 为 NULL 。
-const char *lua_tolstring (lua_State *L, int index, size_t *len);
-   字符串的长度会存在len中
- 
-
- note:
-    lua_pcall msgh 为 0 执行错误将 错误原因放入栈中
-
-
-    lua_tostring(l,-1) 取出错误原因
-
+lua.h
+LUA_OK (0): 成功。
+LUA_ERRRUN: 运行时错误。
+LUA_ERRMEM: 内存分配错误。对于这种错，Lua 不会调用错误处理函数。
+LUA_ERRERR: 在运行错误处理函数时发生的错误。
+LUA_ERRGCMM: 在运行 __gc 元方法时发生的错误。 （这个错误和被调用的函数无关。
 
 ```
 
-## 直观理解Lua栈
+## lua调用c
 ```c
+1.需要将c语言的函数注册到虚拟机
+typedef struct luaL_Reg {
+  const char *name;
+  lua_CFunction func;
+} luaL_Reg;
 
-1.获取全局函数将函数压入栈
-lua_getglobal(state,"onInit")
+typedef int (*lua_CFunction) (lua_State *L);
 
-[onInit]
-
-
-2.将正如压入栈
-lua_pushinteger(state,0)
-[0,onInit]
-
-
-3.压入函数的参数
-[0,onInit]
+2.执行进入c语言函数通过某些方法获取参数和设置对应的返回值就可以了
+   ntoe: 进入到c语言函数式新的栈 如果我们要给返回对应函数将参数压入对应的栈就可以了
 
 
-3.lua_pcall(state,1,0,0)
- 函数调用功能完
- []
-
- 如果函数出现错误
- ["error msgs..."]
-
-```
-
-## lua 调用c 函数
-```c
 int lua_gettop (lua_State *L);
+返回收到 lua 调用传入参数的个数
 
-返回栈顶元素的索引。 因为索引是从 1 开始编号的， 所以这个结果等于栈上的元素个数； 特别指出，0 表示栈为空。
 
+void lua_settop (lua_State *L, int index);
+  设置参数个数 
+  note:设置为0 会将栈上所有参数移除
+  如果设置的栈顶比原来的大 则使用nil填新元素
+
+
+int lua_isstring (lua_State *L, int index);
+    当给定索引的值是一个字符串或是一个数字 （数字总能转换成字符串）时，返回 1 ，否则返回 0 。
+```
+
+
+## API
+
+### 注册c函数到lua
+```c
+
+static const luaL_Reg l[] = {
+    {函数名称,函数指针}
+    ....
+    { NULL, NULL }, //note:{NULL,NULL} 表示结束符号
+};
+
+
+
+
+void lua_setglobal (lua_State *L, const char *name);
+从栈顶弹出一个值将其设置为全局变量为name 的新值
+
+void luaL_newlib (lua_State *L, const luaL_Reg l[]);
+创建一个张新表压入栈顶把表l中的函数注册进去
+
+
+
+void lua_createtable (lua_State *L, int narr, int nrec);
+    1.通过c代理创建一个lua table
+    2.narr ,nrec 数组索引部分 和map key 部分预留多少个位置存储内容
+    3.将table 压入栈顶
+void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);
+
+    将一组c函数注册到栈顶上的表中
+    nup:为每个绑定的c函数绑定upvalue 值
+      upvalue 设置 
+      1.将对应的值压入栈顶
+      2.luaL_setfuncs(L,arr,1) 
+         设置了upvalue 之后 upvalue 弹出 note:此时table仍然在栈中
+
+
+      使用的时候
+          lua_upvalueindex(1) 获取到对应的upvalue的值
+
+
+
+
+
+
+    lua_createtable(L,0,数组中函数数量) 
+    luaL_setfuncs(L,arr,0)
+
+
+
+void lua_newtable (lua_State *L);
+    创建一张空表，并将其压栈。 它等价于 lua_createtable(L, 0, 0) 。
+
+```
+
+### 判断栈上某个元素的类型
+```c
+int lua_isboolean (lua_State *L, int index);
+当给定索引的值是一个布尔量时，返回 1 ，否则返回 0 。
+
+int lua_iscfunction (lua_State *L, int index);
+当给定索引的值是一个 C 函数时，返回 1 ，否则返回 0 。
+
+
+int lua_isfunction (lua_State *L, int index);
+当给定索引的值是一个函数（ C 或 Lua 函数均可）时，返回 1 ，否则返回 0 
+
+int lua_isinteger (lua_State *L, int index);
+当给定索引的值是一个整数 （其值是一个数字，且内部以整数储存）， 时，返回 1 ，否则返回 0 。
+
+
+int lua_islightuserdata (lua_State *L, int index);
+当给定索引的值是一个轻量用户数据时，返回 1 ，否则返回 0 。
+
+int lua_isuserdata (lua_State *L, int index);
+当给定索引的值是一个用户数据（无论是完全的还是轻量的）时， 返回 1 ，否则返回 0 
+
+int lua_isnil (lua_State *L, int index);
+当给定索引的值是 nil 时，返回 1 ，否则返回 0 。
+
+int lua_isnone (lua_State *L, int index);
+当给定索引无效时，返回 1 ，否则返回 0 。
 
 int lua_isstring (lua_State *L, int index);
 当给定索引的值是一个字符串或是一个数字 （数字总能转换成字符串）时，返回 1 ，否则返回 0 。
 
+int lua_istable (lua_State *L, int index);
+当给定索引的值是一张表时，返回 1 ，否则返回 0 。
 
 
-lua call c/c++ function
-   被调用的方法会得到一个新的栈
-   c/c++ 方法需要把返回的结果放入栈中
+int lua_isthread (lua_State *L, int index);
+当给定索引的值是一条线程时，返回 1 ，否则返回 0 。
 
 
-note:
-  lua栈中存入的字符串是引用地址
-  
-  
-
-lua_gettop 参数个数
-
-
-note:
-  栈顶->栈底  -1 ,-2  .....
-  栈底 ->栈顶 1,2,3
 ```
 
-
-## 还需要注册函数
-```lua
-void lua_setglobal (lua_State *L, const char *name);
-从堆栈上弹出一个值，并将其设为全局变量 name 的新值。
-
-void luaL_newlib (lua_State *L, const luaL_Reg l[]);
-创建一张新的表，并把列表 l 中的函数注册进去。
-```
-
-### API
-####  lua_setfield
+### 判断函数参数类型
 ```c
-void lua_setfield (lua_State *L, int index, const char *k);
-
-table[k]=value
-
-table 通过 index 指定栈的索引位置
-v 是 栈顶的值
-
-```
-#### lua_getfield
-```c
-int lua_getfield (lua_State *L, int index, const char *k);
+lua_Integer luaL_checkinteger (lua_State *L, int arg);
+检查函数的第 arg 个参数是否是一个 整数（或是可以被转换为一个整数） 并以 lua_Integer 类型返回这个整数值。
 
 
-把t[k]的值压栈
+const char *luaL_checklstring (lua_State *L, int arg, size_t *l);
 
-t 表示索引index对应的值
+检查函数的第 arg 个参数是否是一个 字符串，并返回该字符串； 如果 l 不为 NULL ， 将字符串的长度填入 *l。
+note: l 传入 指针 可以获取字符串长度 
 
-
-return 返回压入值的类型
-
-```
-#### lua_touserdata
-```c
-void *lua_touserdata (lua_State *L, int index);
-
-执行栈索引返回内存地址 判断该数据值是否是userdata 否则返回NULL
-
-```
-#### luaL_setfuncs
-```c
-void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);
-
-
-例如
-
-static int l_test(lua_State *L)
-{
-    lua_Integer a =
-        lua_tointeger(L, lua_upvalueindex(1));
-
-    lua_Integer b =
-        lua_tointeger(L, lua_upvalueindex(2));
-
-    lua_pushinteger(L, a + b);
-    return 1;
-}
-
-static const luaL_Reg l[] = {
-    {"test", l_test},
-    {NULL, NULL}
-};
-
-lua_newtable(L);          // 1. 创建 table
-lua_pushinteger(L, 10);   // 2. 第一个 upvalue
-lua_pushinteger(L, 20);   // 3. 第二个 upvalue
-
-luaL_setfuncs(L, l, 2);   // 4. 注册函数
+lua_Number luaL_checknumber (lua_State *L, int arg);
+检查函数的第 arg 个参数是否是一个 数字，并返回这个数字。
 
 
 
-// 顶 [20,10,table] 底
+int luaL_checkoption (lua_State *L,
+                      int arg,
+                      const char *def,
+                      const char *const lst[]);
 
-luaL_setfuncs 注册函数
-  将 upvalue 1 =10
-  和 upvalue 2 =20 
-  绑定在test  函数
+arg 第几个参数
+def  默认选项；如果传入 NULL，表示不使用默认选项
 
-
-
-内部
-lua_tointeger(L, lua_upvalueindex(1)); // 10
-lua_tointeger(L, lua_upvalueindex(2)); // 20
+lst 自发货串选项列表 一 NULL 结尾
 
 
+返回值
+   如果参数不在 lst 里面 将抛出错误
+   def 设置 了 如果参数设置为nil 则使用 def 值
 
-注意  注册完了 upvalue 值会弹出
-
-
-```
-
-#### lua_tointeger
-#### lua_tointegerx
-```c
-lua_Integer lua_tointeger (lua_State *L, int index);
-等价于调用 lua_tointegerx， 其参数 isnum 为 NULL。
+    返回值是lst 里面的索引号
 
 
-lua_Integer lua_tointegerx (lua_State *L, int index, int *isnum);
+void luaL_checkstack (lua_State *L, int sz, const char *msg);
+
+用于检测栈空间是否足够 并在必要的时候尝试扩展栈空间
 
 
-将给定索引处的 Lua 值转换为带符号的整数类型 lua_Integer,lua值必须是正式或是一个可以被转换为正式的数字和字符串,否则返回0
+sz:需要额外预留栈空间数量
+   例如 设置为 10 表示确保至少有10个栈曹
 
-如果 isnum 不是 NULL， *isnum 会被设为操作是否成功。
-```
+栈空间不足时用于错误提示的描述文字；可以是 NULL
 
-#### lua_touserdata
-```c
-void *lua_touserdata (lua_State *L, int index);
 
-指定索引处的位置是否一个完全用户数据
-返回的是地址值 
-入股不是返回NULL
-```
-#### luaL_checktype
-```c
+    int lua_checkstack (lua_State *L, int n);
+    返回栈还有几个空位 返回 0表示没有空位
+
+
+const char *luaL_checkstring (lua_State *L, int arg);
+  检查函数的第 arg 个参数是否是一个 字符串并返回这个字符串。
+
+const char *lua_tolstring (lua_State *L, int index, size_t *len);
+
+    lua 值必须是一个string 或 数字 否则返回 NULL
+
+
 void luaL_checktype (lua_State *L, int arg, int t);
 
 检查第arg 参数什么类型 t 传入对应的类型
@@ -284,67 +314,9 @@ void luaL_checktype (lua_State *L, int arg, int t);
 
  LUA_TNIL， LUA_TNUMBER， LUA_TBOOLEAN， LUA_TSTRING， LUA_TTABLE， LUA_TFUNCTION， LUA_TUSERDATA， LUA_TTHREAD， LUA_TLIGHTUSERDATA。
 
+
+
+void luaL_checkversion (lua_State *L);
+检查调用它的内核是否是创建这个 Lua 状态机的内核。 以及调用它的代码是否使用了相同的 Lua 版本。 同时也检查调用它的内核与创建该 Lua 状态机的内核 是否使用了同一片地址空间。
 ```
 
-#### lua_settop 
-```c
-void lua_settop (lua_State *L, int index);
-
-把栈顶设置为这个索引,如果设置的值比本来索引大则nil来填充
-
-index 0 栈上所有元素移除
-
-
-```
-
-#### lua_newuserdatauv
-```c
-void *lua_newuserdatauv (lua_State *L, size_t size, int nuvalue);
-
-
-
-该函数创建并向栈压入一个新的用户数据块,其中包含 nuvalue 关联的lua值(用户值)
-
-
-
-int lua_setiuservalue (lua_State *L, int index, int n);
-
-int lua_getiuservalue (lua_State *L, int index, int n);
-
-通过这两个函数设置和获取用户值
-
-```
-
-#### lua_newthread
-```c
-lua_State *lua_newthread (lua_State *L);
-
-
-创建一条新线程，并将其压栈， 并返回维护这个线程的 lua_State 指针。 这个函数返回的新线程共享原线程的全局环境， 但是它有独立的运行栈。
-
-没有显式的函数可以用来关闭或销毁掉一个线程。 线程跟其它 Lua 对象一样是垃圾收集的条目之一。
-
-```
-
-#### lua_pushcfunction
-```c
-void lua_pushcfunction (lua_State *L, lua_CFunction f);
-
-将一个 C 函数压栈。 这个函数接收一个 C 函数指针， 并将一个类型为 function 的 Lua 值压栈。 当这个栈顶的值被调用时，将触发对应的 C 函数。
-
-注册到 Lua 中的任何函数都必须遵循正确的协议来接收参数和返回值 （参见 lua_CFunction ）。
-```
-
-#### lua_xmove
-```c
-void lua_xmove (lua_State *from, lua_State *to, int n);
-交换同一个状态机下不同线程中的值。
-
-这个函数会从 from 的栈上弹出 n 个值， 然后把它们压入 to 的栈上。
-```
-
-#### lua_pop
-```c
-void lua_pop (lua_State *L, int n);
-从栈中弹出 n 个元素。
-```
