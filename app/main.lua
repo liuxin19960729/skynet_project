@@ -24,6 +24,7 @@ local function connect(cfd, addr)
 end
 
 skynet.start(function()
+    print("app/main.lua skynet.start")
     local listenFd = socket.listen("0.0.0.0", 8888, 2)
 
     -- 新accept 计入进来都会调用 connect

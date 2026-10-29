@@ -159,6 +159,7 @@ note:
   栈底 ->栈顶 1,2,3
 ```
 
+
 ## 还需要注册函数
 ```lua
 void lua_setglobal (lua_State *L, const char *name);
@@ -166,4 +167,184 @@ void lua_setglobal (lua_State *L, const char *name);
 
 void luaL_newlib (lua_State *L, const luaL_Reg l[]);
 创建一张新的表，并把列表 l 中的函数注册进去。
+```
+
+### API
+####  lua_setfield
+```c
+void lua_setfield (lua_State *L, int index, const char *k);
+
+table[k]=value
+
+table 通过 index 指定栈的索引位置
+v 是 栈顶的值
+
+```
+#### lua_getfield
+```c
+int lua_getfield (lua_State *L, int index, const char *k);
+
+
+把t[k]的值压栈
+
+t 表示索引index对应的值
+
+
+return 返回压入值的类型
+
+```
+#### lua_touserdata
+```c
+void *lua_touserdata (lua_State *L, int index);
+
+执行栈索引返回内存地址 判断该数据值是否是userdata 否则返回NULL
+
+```
+#### luaL_setfuncs
+```c
+void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);
+
+
+例如
+
+static int l_test(lua_State *L)
+{
+    lua_Integer a =
+        lua_tointeger(L, lua_upvalueindex(1));
+
+    lua_Integer b =
+        lua_tointeger(L, lua_upvalueindex(2));
+
+    lua_pushinteger(L, a + b);
+    return 1;
+}
+
+static const luaL_Reg l[] = {
+    {"test", l_test},
+    {NULL, NULL}
+};
+
+lua_newtable(L);          // 1. 创建 table
+lua_pushinteger(L, 10);   // 2. 第一个 upvalue
+lua_pushinteger(L, 20);   // 3. 第二个 upvalue
+
+luaL_setfuncs(L, l, 2);   // 4. 注册函数
+
+
+
+// 顶 [20,10,table] 底
+
+luaL_setfuncs 注册函数
+  将 upvalue 1 =10
+  和 upvalue 2 =20 
+  绑定在test  函数
+
+
+
+内部
+lua_tointeger(L, lua_upvalueindex(1)); // 10
+lua_tointeger(L, lua_upvalueindex(2)); // 20
+
+
+
+注意  注册完了 upvalue 值会弹出
+
+
+```
+
+#### lua_tointeger
+#### lua_tointegerx
+```c
+lua_Integer lua_tointeger (lua_State *L, int index);
+等价于调用 lua_tointegerx， 其参数 isnum 为 NULL。
+
+
+lua_Integer lua_tointegerx (lua_State *L, int index, int *isnum);
+
+
+将给定索引处的 Lua 值转换为带符号的整数类型 lua_Integer,lua值必须是正式或是一个可以被转换为正式的数字和字符串,否则返回0
+
+如果 isnum 不是 NULL， *isnum 会被设为操作是否成功。
+```
+
+#### lua_touserdata
+```c
+void *lua_touserdata (lua_State *L, int index);
+
+指定索引处的位置是否一个完全用户数据
+返回的是地址值 
+入股不是返回NULL
+```
+#### luaL_checktype
+```c
+void luaL_checktype (lua_State *L, int arg, int t);
+
+检查第arg 参数什么类型 t 传入对应的类型
+
+
+ LUA_TNIL， LUA_TNUMBER， LUA_TBOOLEAN， LUA_TSTRING， LUA_TTABLE， LUA_TFUNCTION， LUA_TUSERDATA， LUA_TTHREAD， LUA_TLIGHTUSERDATA。
+
+```
+
+#### lua_settop 
+```c
+void lua_settop (lua_State *L, int index);
+
+把栈顶设置为这个索引,如果设置的值比本来索引大则nil来填充
+
+index 0 栈上所有元素移除
+
+
+```
+
+#### lua_newuserdatauv
+```c
+void *lua_newuserdatauv (lua_State *L, size_t size, int nuvalue);
+
+
+
+该函数创建并向栈压入一个新的用户数据块,其中包含 nuvalue 关联的lua值(用户值)
+
+
+
+int lua_setiuservalue (lua_State *L, int index, int n);
+
+int lua_getiuservalue (lua_State *L, int index, int n);
+
+通过这两个函数设置和获取用户值
+
+```
+
+#### lua_newthread
+```c
+lua_State *lua_newthread (lua_State *L);
+
+
+创建一条新线程，并将其压栈， 并返回维护这个线程的 lua_State 指针。 这个函数返回的新线程共享原线程的全局环境， 但是它有独立的运行栈。
+
+没有显式的函数可以用来关闭或销毁掉一个线程。 线程跟其它 Lua 对象一样是垃圾收集的条目之一。
+
+```
+
+#### lua_pushcfunction
+```c
+void lua_pushcfunction (lua_State *L, lua_CFunction f);
+
+将一个 C 函数压栈。 这个函数接收一个 C 函数指针， 并将一个类型为 function 的 Lua 值压栈。 当这个栈顶的值被调用时，将触发对应的 C 函数。
+
+注册到 Lua 中的任何函数都必须遵循正确的协议来接收参数和返回值 （参见 lua_CFunction ）。
+```
+
+#### lua_xmove
+```c
+void lua_xmove (lua_State *from, lua_State *to, int n);
+交换同一个状态机下不同线程中的值。
+
+这个函数会从 from 的栈上弹出 n 个值， 然后把它们压入 to 的栈上。
+```
+
+#### lua_pop
+```c
+void lua_pop (lua_State *L, int n);
+从栈中弹出 n 个元素。
 ```
