@@ -337,3 +337,34 @@ void lua_pushlightuserdata (lua_State *L, void *p);
 
 
 ```
+
+### c 遍历 lua table 变量
+```c
+
+int lua_next (lua_State *L, int index);
+
+return 0 表示表中已经没有元素
+从栈顶弹出key,将新的key 压入栈
+
+
+
+
+
+
+
+
+
+lua_pushnil(L);
+
+  while (lua_next(L, t) != 0) {
+       /* 使用 '键' （在索引 -2 处） 和 '值' （在索引 -1 处）*/
+       printf("%s - %s\n",
+              lua_typename(L, lua_type(L, -2)),
+              lua_typename(L, lua_type(L, -1)));
+       /* 移除 '值' ；保留 '键' 做下一次迭代 */
+       lua_pop(L, 1);
+     }
+
+
+note:不能直接使用 lua_tolstring 获取键值 除非明确知道该键值是string类型
+```
